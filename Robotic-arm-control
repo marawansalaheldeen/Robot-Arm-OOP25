@@ -1,0 +1,60 @@
+import math
+
+class RoboticArmSegment:
+    def __init__(self, length, angle):
+        self.length = length
+        self.angle = angle
+        self._start_a = 0  
+        self._start_b = 0
+
+    @property
+    def start_a(self):
+        return self._start_a
+
+    @property
+    def start_b(self):
+        return self._start_b
+
+    @property
+    def end_a(self):
+        return self._start_a + self.length * math.cos(math.radians(self.total_angle))
+
+    @property
+    def end_b(self):
+        return self._start_b + self.length * math.sin(math.radians(self.total_angle))
+
+    def update_start_position(self, prev_end_a, prev_end_b, cumulative_angle):
+        self._start_a = prev_end_a
+        self._start_b = prev_end_b
+        self.total_angle = cumulative_angle + self.angle  
+
+class RoboticArm:
+    def __init__(self):
+        self.segments = []
+
+    def add_segment(self, length, angle):
+        segment = RoboticArmSegment(length, angle)
+        self.segments.append(segment)
+
+    def update_positions(self):
+        prev_end_a, prev_end_b = 0, 0
+        cumulative_angle = 0
+        for segment in self.segments:
+            segment.update_start_position(prev_end_a, prev_end_b, cumulative_angle)
+            prev_end_a, prev_end_b = segment.end_a, segment.end_b
+            cumulative_angle += segment.angle
+
+    def print_positions(self):
+        for i, segment in enumerate(self.segments):
+            print(f"Segment {i+1}:")
+            print(f"  Start: ({segment.start_a:.2f}, {segment.start_b:.2f})")
+            print(f"  End:   ({segment.end_a:.2f}, {segment.end_b:.2f})")
+
+if __name__ == "__main__":
+    arm = RoboticArm()
+    arm.add_segment(100, 45)
+    arm.add_segment(80, -30)
+    arm.add_segment(50, 60)
+    
+    arm.update_positions()
+    arm.print_positions()
