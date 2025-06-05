@@ -60,3 +60,5 @@ pip install numpy matplotlib cryptography
 - Passwords are hashed and salted, but user data is stored in-memory for demonstration.
 - Command encryption uses symmetric keys generated per command instance.
 - **Do not use `eval()` on untrusted data in production.**
+
+`Created by Marwan Salah and Team-3`
