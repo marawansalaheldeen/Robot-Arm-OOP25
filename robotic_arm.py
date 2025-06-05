@@ -4,6 +4,19 @@ from matplotlib.widgets import TextBox
 import hashlib
 import secrets
 from cryptography.fernet import Fernet
+import logging
+from datetime import datetime
+
+
+# Configure the logger to output messages to a log file with timestamp, level, and message.
+logging.basicConfig(
+    filename='robotic_arm_app.log',
+    level=logging.INFO,  ## Log all INFO level and above messages
+    format='%(asctime)s - %(levelname)s - %(message)s '
+)
+
+logger = logging.getLogger(__name__)  # # Create a logger instance for this module
+
 
 class User:
     def __init__(self, username, password, public_key=None, private_key=None):
@@ -32,6 +45,7 @@ class User:
     def verify_password(self, password):
         salt, hash_ = self._password_hash.split('$')
         return hashlib.sha256((salt + password).encode()).hexdigest() == hash_
+    
 
     @classmethod
     def register(cls, username, password):
@@ -47,10 +61,14 @@ user_db = {}
 
 def register_user(username, password):
     if username in user_db:
+        # Log warning if registration fails due to existing username
+        logger.warning(f"Registration failed: username '{username}' already exists.")
         print("Username already exists.")
         return None
     user = User.register(username, password)
     user_db[username] = user
+    # Log success message when a new user is registered
+    logger.info(f"User '{username}' registered successfully.")
     print("Registration successful.")
     return user
 
@@ -95,10 +113,14 @@ def login_gui():
         password = real_password['value']
         user = user_db.get(username)
         if user and User.login(user, password):
+            # Log successful login with username and timestamp
+            logger.info(f"SUCCESS: User '{username}' logged in at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print("Login successful!")
             login_status['authenticated'] = True
             plt.close(fig)
         else:
+            # Log failed login attempt with attempted username and timestamp
+            logger.warning(f"FAILED login attempt for username '{username}' at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print("Invalid credentials. Try again.")
             username_box.set_val("")
             real_password['value'] = ""
@@ -213,10 +235,8 @@ class RoboticArm:
 
         left_perp_dir = perp(claw_left_end - claw_left_start)
         left_perp_dir /= np.linalg.norm(left_perp_dir)
-
         right_perp_dir = perp(claw_right_end - claw_right_start)
         right_perp_dir /= np.linalg.norm(right_perp_dir)
-
         # Second segment ends
         claw_left_second_end = claw_left_end + left_perp_dir * second_segment_len
         claw_right_second_end = claw_right_end + right_perp_dir * second_segment_len
@@ -330,33 +350,48 @@ if __name__ == "__main__":
 
     def handle_command(text):
         parts = command_box.text.strip().split()
+        # DEBUG log to track raw user command input before parsing
+        logger.debug(f"Raw command input: '{text}' parsed into parts: {parts}")
         if not parts:
+            # WARNING log if the user submits an empty command
+            logger.warning("Empty command submitted.")
             status_box.set_val("No command entered.")
             return
         cmd = parts[0].lower()
         try:
             if cmd == "move" and len(parts) == 3:
                 x, y = float(parts[1]), float(parts[2])
+                # DEBUG log to trace MoveCommand creation with coordinates
+                logger.debug(f"Creating MoveCommand with x={x}, y={y}")
                 move_cmd = MoveCommand(x, y)
                 encrypted = move_cmd.encrypt()
                 params = move_cmd.decrypt(encrypted)
                 MoveCommand(params['x'], params['y']).execute(arm)
                 status_box.set_val(f"Moved to ({x}, {y})")
+                logger.info(f"Executed MoveCommand to ({x}, {y})")
             elif cmd == "pickup":
+                logger.debug("Creating PickUpCommand")
                 pickup_cmd = PickUpCommand()
                 encrypted = pickup_cmd.encrypt()
                 params = pickup_cmd.decrypt(encrypted)
                 PickUpCommand().execute(arm)
                 status_box.set_val("Picked up (claw closed)")
+                logger.info("Executed PickUpCommand (claw closed)")
             elif cmd == "place":
+                logger.debug("Creating PlaceCommand")
                 place_cmd = PlaceCommand()
                 encrypted = place_cmd.encrypt()
                 params = place_cmd.decrypt(encrypted)
                 PlaceCommand().execute(arm)
                 status_box.set_val("Placed (claw opened)")
+                logger.info("Executed PlaceCommand (claw opened)")
             else:
+                # WARNING log if user enters an unrecognized or malformed command
+                logger.warning(f"Invalid command: {text}")
                 status_box.set_val("Unknown command or wrong parameters.")
         except Exception as e:
+            # ERROR log for any unexpected exception that occurs during command handling
+            logger.error(f"Error handling command '{text}': {e}")
             status_box.set_val(f"Error: {e}")
         arm.draw(ax)
 
